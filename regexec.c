@@ -83,8 +83,17 @@
 #include "invlist_inline.h"
 #include "unicode_constants.h"
 
-#define B_ON_NON_UTF8_LOCALE_IS_WRONG            \
- "Use of \\b{} or \\B{} for non-UTF-8 locale is wrong.  Assuming a UTF-8 locale"
+static const char b_utf8_locale_required[] =
+ "Use of \\b{} or \\B{} for non-UTF-8 locale is wrong."
+                                                "  Assuming a UTF-8 locale";
+
+#define CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND                       \
+    STMT_START {                                                            \
+        if (! IN_UTF8_CTYPE_LOCALE) {                                       \
+          Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),                       \
+                                                b_utf8_locale_required);    \
+        }                                                                   \
+    } STMT_END
 
 static const char sets_utf8_locale_required[] =
       "Use of (?[ ]) for non-UTF-8 locale is wrong.  Assuming a UTF-8 locale";
@@ -2621,10 +2630,7 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
             break;
         }
 
-        if (! IN_UTF8_CTYPE_LOCALE) {
-            Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),
-                                            B_ON_NON_UTF8_LOCALE_IS_WRONG);
-        }
+        CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND;
 
         to_complement = 1;
         goto do_boundu_non_utf8;
@@ -2637,10 +2643,7 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
             break;
         }
 
-        if (! IN_UTF8_CTYPE_LOCALE) {
-            Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),
-                                                B_ON_NON_UTF8_LOCALE_IS_WRONG);
-        }
+        CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND;
 
         goto do_boundu_non_utf8;
 
@@ -2772,10 +2775,7 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
             break;
         }
 
-        if (! IN_UTF8_CTYPE_LOCALE) {
-            Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),
-                                                B_ON_NON_UTF8_LOCALE_IS_WRONG);
-        }
+        CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND;
 
         to_complement = 1;
         goto do_boundu_utf8;
@@ -2789,10 +2789,7 @@ S_find_byclass(pTHX_ regexp * prog, const regnode *c, char *s,
             break;
         }
 
-        if (! IN_UTF8_CTYPE_LOCALE) {
-            Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),
-                                            B_ON_NON_UTF8_LOCALE_IS_WRONG);
-        }
+        CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND;
 
         to_complement = 1;
         goto do_boundu_utf8;
@@ -6794,10 +6791,7 @@ S_regmatch(pTHX_ regmatch_info *reginfo, char *startpos, regnode *prog)
             _CHECK_AND_WARN_PROBLEMATIC_LOCALE;
 
             if (FLAGS(scan) != TRADITIONAL_BOUND) {
-                if (! IN_UTF8_CTYPE_LOCALE) {
-                    Perl_ck_warner(aTHX_ packWARN(WARN_LOCALE),
-                                                B_ON_NON_UTF8_LOCALE_IS_WRONG);
-                }
+                CHECK_AND_WARN_NON_UTF8_CTYPE_LOCALE_IN_BOUND;
                 goto boundu;
             }
 
