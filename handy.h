@@ -430,12 +430,24 @@ Perl_xxx(aTHX_ ...) form for any API calls where it's used.
 	Perl_get_cvn_flags(aTHX_ STR_WITH_LEN(str), (flags))
 
 /* internal helpers */
-#define PERL_RVS_TO_DECIMAL_(r,v,s) (((r)*1000000)+((v)*1000)+(s))
+/* Temporaries */
+#ifndef PERL_MAJOR_VERSION
+#  define PERL_MAJOR_VERSION  PERL_REVISION
+#endif
+#ifndef PERL_MINOR_VERSION
+#  define PERL_MINOR_VERSION  PERL_VERSION
+#endif
+#ifndef PERL_MICRO_VERSION
+#  define PERL_MICRO_VERSION  PERL_SUBVERSION
+#endif
+
+#define PERL_JNC_TO_DECIMAL_(maJor,miNor,miCro) (((maJor)*1000000)+((miNor)*1000)+(miCro))
+#define PERL_RVS_TO_DECIMAL_ PERL_JNC_TO_DECIMAL_(r,v,s)
 #define PERL_DECIMAL_VERSION_                                               \
-        PERL_RVS_TO_DECIMAL_(PERL_REVISION, PERL_VERSION, PERL_SUBVERSION)
+        PERL_JNC_TO_DECIMAL_(PERL_MAJOR_VERSION, PERL_MINOR_VERSION, PERL_MICRO_VERSION)
 
 /*
-=for apidoc AmR|bool|PERL_VERSION_EQ|const int r|const int v|const int s
+=for apidoc AmR|bool|PERL_VERSION_EQ|const U8 major|const U8 minor|const U8 micro
 
 Returns whether or not the perl currently executing has the specified
 relationship to the perl given by the parameters.  For example,
@@ -452,21 +464,48 @@ The possible comparisons are C<PERL_VERSION_EQ>, C<PERL_VERSION_NE>,
 C<PERL_VERSION_GE>, C<PERL_VERSION_GT>, C<PERL_VERSION_LE>, and
 C<PERL_VERSION_LT>.
 
-=for apidoc AmRh|bool|PERL_VERSION_NE|const int r|const int v|const int s
-=for apidoc AmRh|bool|PERL_VERSION_GE|const int r|const int v|const int s
-=for apidoc AmRh|bool|PERL_VERSION_GT|const int r|const int v|const int s
-=for apidoc AmRh|bool|PERL_VERSION_LE|const int r|const int v|const int s
-=for apidoc AmRh|bool|PERL_VERSION_LT|const int r|const int v|const int s
+You may use the special value '*' for the final number to mean ALL possible
+values for it.  Thus,
+
+ #if PERL_VERSION_GT(5,9,'*')
+
+is effectively
+
+ #if PERL_VERSION_GE(5,10,0)
+
+This means you don't have to think so much when converting from the existing
+deprecated C<PERL_VERSION> to using this macro:
+
+ #if PERL_VERSION <= 9
+
+becomes
+
+ #if PERL_VERSION_LE(5,9,'*')
+
+=for apidoc AmRh|bool|PERL_VERSION_NE|const U8 major|const U8 minor|const U8 micro
+=for apidoc AmRh|bool|PERL_VERSION_GE|const U8 major|const U8 minor|const U8 micro
+=for apidoc AmRh|bool|PERL_VERSION_GT|const U8 major|const U8 minor|const U8 micro
+=for apidoc AmRh|bool|PERL_VERSION_LE|const U8 major|const U8 minor|const U8 micro
+=for apidoc AmRh|bool|PERL_VERSION_LT|const U8 major|const U8 minor|const U8 micro
 
 =cut
 */
 
-# define PERL_VERSION_EQ(r,v,s) (PERL_DECIMAL_VERSION_ == PERL_RVS_TO_DECIMAL_(r,v,s))
-# define PERL_VERSION_NE(r,v,s) (! PERL_VERSION_EQ(r,v,s))
-# define PERL_VERSION_LT(r,v,s) (PERL_DECIMAL_VERSION_ < PERL_RVS_TO_DECIMAL_(r,v,s))
-# define PERL_VERSION_LE(r,v,s) (PERL_DECIMAL_VERSION_ <= PERL_RVS_TO_DECIMAL_(r,v,s))
-# define PERL_VERSION_GT(r,v,s) (! PERL_VERSION_LE(r,v,s))
-# define PERL_VERSION_GE(r,v,s) (! PERL_VERSION_LT(r,v,s))
+# define PERL_VERSION_EQ(j,n,c)                                             \
+                    (PERL_DECIMAL_VERSION_ == PERL_JNC_TO_DECIMAL_(j,n,c))
+# define PERL_VERSION_NE(j,n,c) (! PERL_VERSION_EQ(j,n,c))
+
+# define PERL_VERSION_LT(j,n,c) /* < '*' effectively means < 0 */           \
+    (PERL_DECIMAL_VERSION_ < PERL_JNC_TO_DECIMAL_( (j),                     \
+                                                   (n),                     \
+                                                 (((c) == '*') ? 0 : c)))
+# define PERL_VERSION_GE(j,n,c)  (! PERL_VERSION_LT(j,n,c))
+
+# define PERL_VERSION_LE(j,n,c)  /* <= '*' effectively means < n+1 */       \
+    (PERL_DECIMAL_VERSION_ < PERL_JNC_TO_DECIMAL_(                  (j),    \
+                                          (((c) == '*') ? ((n)+1) : (n)),   \
+                                          (((c) == '*') ? 0 : c)))
+# define PERL_VERSION_GT(j,n,c) (! PERL_VERSION_LE(j,n,c))
 
 /*
 =head1 Miscellaneous Functions
