@@ -430,26 +430,34 @@ Perl_xxx(aTHX_ ...) form for any API calls where it's used.
 	Perl_get_cvn_flags(aTHX_ STR_WITH_LEN(str), (flags))
 
 /* internal helpers */
-/* Temporaries */
+/* Transitional */
 #ifndef PERL_MAJOR_VERSION
 #  define PERL_MAJOR_VERSION  PERL_REVISION
+#else
+#  undef  PERL_REVISION     /* We don't want code to be using these */
 #endif
 #ifndef PERL_MINOR_VERSION
 #  define PERL_MINOR_VERSION  PERL_VERSION
+#else
+#  undef  PERL_VERSION
 #endif
 #ifndef PERL_MICRO_VERSION
 #  define PERL_MICRO_VERSION  PERL_SUBVERSION
+#else
+#  undef  PERL_SUBVERSION
 #endif
 
-#define PERL_JNC_TO_DECIMAL_(maJor,miNor,miCro) (((maJor)*1000000)+((miNor)*1000)+(miCro))
-#define PERL_RVS_TO_DECIMAL_ PERL_JNC_TO_DECIMAL_(r,v,s)
+#define PERL_JNC_TO_DECIMAL_(maJor,miNor,miCro)                             \
+            /* '10*' leaves room for things like alpha, beta, releases */   \
+                    (10 * ((maJor) * 1000000) + ((miNor) * 1000) + (miCro))
 #define PERL_DECIMAL_VERSION_                                               \
-        PERL_JNC_TO_DECIMAL_(PERL_MAJOR_VERSION, PERL_MINOR_VERSION, PERL_MICRO_VERSION)
+        PERL_JNC_TO_DECIMAL_(PERL_MAJOR_VERSION, PERL_MINOR_VERSION,        \
+                                                        PERL_MICRO_VERSION)
 
 /*
 =for apidoc AmR|bool|PERL_VERSION_EQ|const U8 major|const U8 minor|const U8 micro
 
-Returns whether or not the perl currently executing has the specified
+Returns whether or not the perl currently being compiled has the specified
 relationship to the perl given by the parameters.  For example,
 
  #if PERL_VERSION_GT(5,24,2)
@@ -495,6 +503,8 @@ becomes
                     (PERL_DECIMAL_VERSION_ == PERL_JNC_TO_DECIMAL_(j,n,c))
 # define PERL_VERSION_NE(j,n,c) (! PERL_VERSION_EQ(j,n,c))
 
+/* N.B. These don't work if the micro is 42 or 92, as those are what '*' is in
+ * ASCII and EBCDIC respectively */
 # define PERL_VERSION_LT(j,n,c) /* < '*' effectively means < 0 */           \
     (PERL_DECIMAL_VERSION_ < PERL_JNC_TO_DECIMAL_( (j),                     \
                                                    (n),                     \
