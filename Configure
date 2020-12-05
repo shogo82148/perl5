@@ -5090,15 +5090,29 @@ esac
 echo " "
 echo "Checking for GNU C Library..." >&4
 cat >gnulibc.c <<EOM
+/* Find out version of GNU C library.  __GLIBC__ and __GLIBC_MINOR__
+   alone are insufficient to distinguish different versions, such as
+   2.0.6 and 2.0.7.  The function gnu_get_libc_version() appeared in
+   libc version 2.1.0.      A. Dougherty,  June 3, 2002.
+*/
 #include <stdio.h>
-int main()
+int main(void)
 {
 #ifdef __GLIBC__
-    exit(0);
+#   ifdef __GLIBC_MINOR__
+#       if __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 1
+#           include <gnu/libc-version.h>
+	    printf("%s\n",  gnu_get_libc_version());
+#       else
+	    printf("%d.%d\n",  __GLIBC__, __GLIBC_MINOR__);
+#       endif
+#   else
+	printf("%d\n",  __GLIBC__);
+#   endif
+    return 0;
 #else
-    exit(1);
+    return 1;
 #endif
-}
 EOM
 set gnulibc
 if eval $compile_ok && ./gnulibc; then
