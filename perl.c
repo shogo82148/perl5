@@ -2631,7 +2631,7 @@ sed %s -e \"/^[^#]/b\" \
  -e '/^#[ 	]*undef[ 	]/b' \
  -e '/^#[ 	]*endif/b' \
  -e 's/^[ 	]*#.*//' \
- %s | %"SVf" -C %"SVf" %s",
+ %s | %"SVf" -C -ffreestanding %"SVf" %s",
 #  endif
 #ifdef LOC_SED
 	  LOC_SED,
