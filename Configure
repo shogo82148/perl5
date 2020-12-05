@@ -6328,10 +6328,6 @@ $rm -f try.c try
 set i_malloc
 eval $setvar
 
-: see if stdlib is available
-set stdlib.h i_stdlib
-eval $inhdr
-
 : determine which malloc to compile in
 echo " "
 case "$usemymalloc" in
@@ -6340,7 +6336,7 @@ case "$usemymalloc" in
 *)	case "$ptrsize" in
 	4) dflt='y' ;;
 	*) dflt='n' ;;
-esac
+	esac
 	;;
 esac
 rp="Do you wish to attempt to use the malloc that comes with $package?"
