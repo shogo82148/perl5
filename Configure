@@ -5115,15 +5115,17 @@ int main(void)
 #endif
 }
 EOCP
-set gnulibc
-if eval $compile_ok && ./gnulibc; then
+set try
+if eval $compile_ok && $run ./try > glibc.ver; then
 	val="$define"
-	echo "You are using the GNU C Library"
+	gnulibc_version=`$cat glibc.ver`
+	echo "You are using the GNU C Library version $gnulibc_version"
 else
 	val="$undef"
+	gnulibc_version=''
 	echo "You are not using the GNU C Library"
 fi
-$rm -f gnulibc*
+$rm -f try try.* glibc.ver
 set d_gnulibc
 eval $setvar
 
