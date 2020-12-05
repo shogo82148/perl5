@@ -13563,6 +13563,122 @@ esac
 
 
 
+
+: see if sqrtl exists
+set sqrtl d_sqrtl
+eval $inlibc
+
+: see if scalbnl exists
+set scalbnl d_scalbnl
+eval $inlibc
+
+: see if modfl exists
+set modfl d_modfl
+eval $inlibc
+
+: see if prototype for modfl is available
+echo " "
+set d_modflproto modfl math.h
+eval $hasproto
+
+d_modfl_pow32_bug="$undef"
+
+case "$d_longdbl$d_modfl" in
+$define$define)
+	$cat <<EOM
+Checking to see whether your modfl() is okay for large values...
+EOM
+$cat >try.c <<EOCP
+#include <math.h> 
+#include <stdio.h>
+EOCP
+if $test "X$d_modflproto" != "X$define"; then
+	$cat >>try.c <<EOCP
+/* Sigh. many current glibcs provide the function, but do not prototype it.  */ 
+long double modfl (long double, long double *);
+EOCP
+fi
+$cat >>try.c <<EOCP
+int main() {
+    long double nv = 4294967303.15;
+    long double v, w;
+    v = modfl(nv, &w);         
+#ifdef __GLIBC__
+    printf("glibc");
+#endif
+    printf(" %"$sPRIfldbl" %"$sPRIfldbl" %"$sPRIfldbl"\n", nv, v, w);
+    return 0;
+}
+EOCP
+	case "$osname:$gccversion" in
+	aix:)	saveccflags="$ccflags"
+		ccflags="$ccflags -qlongdouble" ;; # to avoid core dump
+	esac
+	set try
+	if eval $compile; then
+		foo=`$run ./try`
+		case "$foo" in
+		*" 4294967303.150000 1.150000 4294967302.000000")
+			echo >&4 "Your modfl() is broken for large values."
+			d_modfl_pow32_bug="$define"
+			case "$foo" in
+			glibc)	echo >&4 "You should upgrade your glibc to at least 2.2.2 to get a fixed modfl()."
+			;;
+			esac
+			;;
+		*" 4294967303.150000 0.150000 4294967303.000000")
+			echo >&4 "Your modfl() seems okay for large values."
+			;;
+		*)	echo >&4 "I don't understand your modfl() at all."
+			d_modfl="$undef"
+			;;
+		esac
+		$rm -f try.* try core core.try.*
+	else
+		echo "I cannot figure out whether your modfl() is okay, assuming it isn't."
+		d_modfl="$undef"
+	fi
+	case "$osname:$gccversion" in
+	aix:)	ccflags="$saveccflags" ;; # restore
+	esac
+	;;
+esac
+
+if $test "$uselongdouble" = "$define"; then
+    message=""
+    if $test "$d_sqrtl" != "$define"; then
+	message="$message sqrtl"
+    fi
+    if $test "$d_modfl" != "$define"; then
+	if $test "$d_aintl:$d_copysignl" = "$define:$define"; then
+	    echo "You have both aintl and copysignl, so I can emulate modfl."
+	else
+	    message="$message modfl"
+	fi
+    fi
+    if $test "$d_frexpl" != "$define"; then
+	if $test "$d_ilogbl:$d_scalbnl" = "$define:$define"; then
+	    echo "You have both ilogbl and scalbnl, so I can emulate frexpl."
+	else
+	    message="$message frexpl"
+	fi
+    fi
+
+    if $test "$message" != ""; then
+	$cat <<EOM >&4
+
+*** You requested the use of long doubles but you do not seem to have
+*** the following mathematical functions needed for long double support:
+***    $message
+*** Please rerun Configure without -Duselongdouble and/or -Dusemorebits.
+*** Cannot continue, aborting.
+
+EOM
+
+	exit 1
+    fi
+fi
+
 : see if mprotect exists
 set mprotect d_mprotect
 eval $inlibc
