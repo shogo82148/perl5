@@ -8811,7 +8811,7 @@ int main()
 EOCP
 set try
 if eval $compile_ok; then
-	./try
+	$run ./try
 	castflags=$?
 else
 	echo "(I can't seem to compile the test program--assuming it can't)"
@@ -8834,8 +8834,12 @@ echo " "
 if set vprintf val -f d_vprintf; eval $csym; $val; then
 	echo 'vprintf() found.' >&4
 	val="$define"
-	$cat >vprintf.c <<'EOF'
+	$cat >try.c <<EOF
 #include <varargs.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 
 int main() { xxx("foo"); }
 
@@ -8849,8 +8853,8 @@ va_dcl
 	exit((unsigned long)vsprintf(buf,"%s",args) > 10L);
 }
 EOF
-	set vprintf
-	if eval $compile && ./vprintf; then
+	set try
+	if eval $compile && $run ./try; then
 		echo "Your vsprintf() returns (int)." >&4
 		val2="$undef"
 	else
@@ -8904,7 +8908,11 @@ eval $setvar
 
 : see if crypt exists
 echo " "
-if set crypt val -f d_crypt; eval $csym; $val; then
+set crypt d_crypt
+eval $inlibc
+case "$d_crypt" in
+$define) cryptlib='' ;;
+*)	if set crypt val -f d_crypt; eval $csym; $val; then
 	echo 'crypt() found.' >&4
 	val="$define"
 	cryptlib=''
@@ -9585,7 +9593,7 @@ case "$d_fcntl" in
 "$define")
 	set try
 	if eval $compile_ok; then
-		if ./try; then
+		if $run ./try; then
 			echo "Yes, it seems to work."
 			val="$define"
 		else
@@ -9716,7 +9724,7 @@ echo " "
 if test "X$timeincl" = X; then
 	echo "Testing to see if we should include <time.h>, <sys/time.h> or both." >&4
 	$echo $n "I'm now running the test program...$c"
-	$cat >try.c <<'EOCP'
+	$cat >try.c <<EOCP
 #include <sys/types.h>
 #ifdef I_TIME
 #include <time.h>
@@ -9729,6 +9737,10 @@ if test "X$timeincl" = X; then
 #endif
 #ifdef I_SYSSELECT
 #include <sys/select.h>
+#endif
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
 #endif
 int main()
 {
@@ -9800,7 +9812,11 @@ $cat <<EOM
 
 Checking to see how well your C compiler handles fd_set and friends ...
 EOM
-$cat >fd_set.c <<EOCP
+$cat >try.c <<EOCP
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 #$i_systime I_SYS_TIME
 #$i_sysselct I_SYS_SELECT
 #$d_socket HAS_SOCKET
@@ -9828,12 +9844,12 @@ int main() {
 #endif
 }
 EOCP
-set fd_set -DTRYBITS
+set try -DTRYBITS
 if eval $compile; then
 	d_fds_bits="$define"
 	d_fd_set="$define"
 	echo "Well, your system knows about the normal fd_set typedef..." >&4
-	if ./fd_set; then
+	if $run ./try; then
 		echo "and you have the normal fd_set macros (just as I'd expect)." >&4
 		d_fd_macros="$define"
 	else
@@ -9846,12 +9862,12 @@ else
 	$cat <<'EOM'
 Hmm, your compiler has some difficulty with fd_set.  Checking further...
 EOM
-	set fd_set
+	set try
 	if eval $compile; then
 		d_fds_bits="$undef"
 		d_fd_set="$define"
 		echo "Well, your system has some sort of fd_set available..." >&4
-		if ./fd_set; then
+		if $run ./try; then
 			echo "and you have the normal fd_set macros." >&4
 			d_fd_macros="$define"
 		else
@@ -9867,7 +9883,7 @@ EOM
 		d_fd_macros="$undef"
 	fi
 fi
-$rm -f fd_set*
+$rm -f try try.*
 
 : see if fgetpos exists
 set fgetpos d_fgetpos
