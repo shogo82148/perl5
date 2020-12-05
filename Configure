@@ -8198,7 +8198,7 @@ eval $inlibc
 case "$d_access" in
 "$define")
 	echo " "
-	$cat >access.c <<'EOCP'
+	$cat >access.c <<EOCP
 #include <sys/types.h>
 #ifdef I_FCNTL
 #include <fcntl.h>
@@ -8208,6 +8208,10 @@ case "$d_access" in
 #endif
 #ifdef I_UNISTD
 #include <unistd.h>
+#endif
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
 #endif
 int main() {
 	exit(R_OK);
