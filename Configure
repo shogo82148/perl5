@@ -14238,7 +14238,8 @@ esac
 
 : check for the select 'width'
 case "$selectminbits" in
-'') case "$d_select" in
+'') safebits=`expr $ptrsize \* 8`
+    case "$d_select" in
 	$define)
 		$cat <<EOM
 
