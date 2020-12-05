@@ -6059,6 +6059,7 @@ if $cc $ccflags -c prototype.c >prototype.out 2>&1 ; then
 else
 	echo "Your C compiler doesn't seem to understand function prototypes."
 	val="$undef"
+	cat prototype.out
 fi
 set prototype
 eval $setvar
