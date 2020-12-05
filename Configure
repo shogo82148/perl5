@@ -3697,6 +3697,154 @@ y)	fn=d/
 	;;
 esac
 
+: see how we invoke the C preprocessor
+echo " "
+echo "Now, how can we feed standard input to your C preprocessor..." >&4
+cat <<'EOT' >testcpp.c
+#define ABC abc
+#define XYZ xyz
+ABC.XYZ
+EOT
+cd ..
+if test ! -f cppstdin; then
+	if test "X$osname" = "Xaix" -a "X$gccversion" = X; then
+		# AIX cc -E doesn't show the absolute headerfile
+		# locations but we'll cheat by using the -M flag.
+		echo 'cat >.$$.c; rm -f .$$.u; '"$cc"' ${1+"$@"} -M -c .$$.c 2>/dev/null; test -s .$$.u && awk '"'"'$2 ~ /\.h$/ { print "# 0 \""$2"\"" }'"'"' .$$.u; rm -f .$$.o .$$.u; '"$cc"' -E ${1+"$@"} .$$.c; rm .$$.c' > cppstdin
+	else
+		echo 'cat >.$$.c; '"$cc"' -E ${1+"$@"} .$$.c; rm .$$.c' >cppstdin
+	fi
+else
+	echo "Keeping your $hint cppstdin wrapper."
+fi
+chmod 755 cppstdin
+wrapper=`pwd`/cppstdin
+ok='false'
+cd UU
+
+if $test "X$cppstdin" != "X" && \
+	$cppstdin $cppminus <testcpp.c >testcpp.out 2>&1 && \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1
+then
+	echo "You used to use $cppstdin $cppminus so we'll use that again."
+	case "$cpprun" in
+	'') echo "But let's see if we can live without a wrapper..." ;;
+	*)
+		if $cpprun $cpplast <testcpp.c >testcpp.out 2>&1 && \
+			$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1
+		then
+			echo "(And we'll use $cpprun $cpplast to preprocess directly.)"
+			ok='true'
+		else
+			echo "(However, $cpprun $cpplast does not work, let's see...)"
+		fi
+		;;
+	esac
+else
+	case "$cppstdin" in
+	'') ;;
+	*)
+		echo "Good old $cppstdin $cppminus does not seem to be of any help..."
+		;;
+	esac
+fi
+
+if $ok; then
+	: nothing
+elif echo 'Maybe "'"$cc"' -E" will work...'; \
+	$cc -E <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "Yup, it does."
+	x_cpp="$cc -E"
+	x_minus='';
+elif echo 'Nope...maybe "'"$cc"' -E -" will work...'; \
+	$cc -E - <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "Yup, it does."
+	x_cpp="$cc -E"
+	x_minus='-';
+elif echo 'Nope...maybe "'"$cc"' -P" will work...'; \
+	$cc -P <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "Yipee, that works!"
+	x_cpp="$cc -P"
+	x_minus='';
+elif echo 'Nope...maybe "'"$cc"' -P -" will work...'; \
+	$cc -P - <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "At long last!"
+	x_cpp="$cc -P"
+	x_minus='-';
+elif echo 'No such luck, maybe "'$cpp'" will work...'; \
+	$cpp <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "It works!"
+	x_cpp="$cpp"
+	x_minus='';
+elif echo 'Nixed again...maybe "'$cpp' -" will work...'; \
+	$cpp - <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	echo "Hooray, it works!  I was beginning to wonder."
+	x_cpp="$cpp"
+	x_minus='-';
+elif echo 'Uh-uh.  Time to get fancy.  Trying a wrapper...'; \
+	$wrapper <testcpp.c >testcpp.out 2>&1; \
+	$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+	x_cpp="$wrapper"
+	x_minus=''
+	echo "Eureka!"
+else
+	dflt=''
+	rp="No dice.  I can't find a C preprocessor.  Name one:"
+	. ./myread
+	x_cpp="$ans"
+	x_minus=''
+	$x_cpp <testcpp.c >testcpp.out 2>&1
+	if $contains 'abc.*xyz' testcpp.out >/dev/null 2>&1 ; then
+		echo "OK, that will do." >&4
+	else
+echo "Sorry, I can't get that to work.  Go find one and rerun Configure." >&4
+		exit 1
+	fi
+fi
+
+case "$ok" in
+false)
+	cppstdin="$x_cpp"
+	cppminus="$x_minus"
+	cpprun="$x_cpp"
+	cpplast="$x_minus"
+	set X $x_cpp
+	shift
+	case "$1" in
+	"$cpp")
+		echo "Perhaps can we force $cc -E using a wrapper..."
+		if $wrapper <testcpp.c >testcpp.out 2>&1; \
+			$contains 'abc.*xyz' testcpp.out >/dev/null 2>&1
+		then
+			echo "Yup, we can."
+			cppstdin="$wrapper"
+			cppminus='';
+		else
+			echo "Nope, we'll have to live without it..."
+		fi
+		;;
+	esac
+	case "$cpprun" in
+	"$wrapper")
+		cpprun=''
+		cpplast=''
+		;;
+	esac
+	;;
+esac
+
+case "$cppstdin" in
+"$wrapper"|'cppstdin') ;;
+*) $rm -f $wrapper;;
+esac
+$rm -f testcpp.c testcpp.out
+
 : Set private lib path
 case "$plibpth" in
 '') if ./mips; then
@@ -3851,7 +3999,7 @@ for thislib in $libswanted; do
 	for thisdir in $libspath; do
 	    xxx=''
 	    if $test ! -f "$xxx" -a "X$ignore_versioned_solibs" = "X"; then
-		xxx=`ls $thisdir/lib$thislib.$so.[0-9] 2>/dev/null|tail -1`
+		xxx=`ls $thisdir/lib$thislib.$so.[0-9] 2>/dev/null|sed -n '$p'`
 	        $test -f "$xxx" && eval $libscheck
 		$test -f "$xxx" && libstyle=shared
 	    fi
@@ -4063,7 +4211,10 @@ none) ccflags='';;
 esac
 
 : the following weeds options from ccflags that are of no interest to cpp
-cppflags="$ccflags"
+case "$cppflags" in
+'') cppflags="$ccflags" ;;
+*)  cppflags="$cppflags $ccflags" ;;
+esac
 case "$gccversion" in
 1.*) cppflags="$cppflags -D__GNUC__"
 esac
@@ -4186,15 +4337,15 @@ $cat >> try.msg <<EOM
 I used the command:
 
 	$*
-	./try
+	$run ./try
 
 and I got the following output:
 
 EOM
 dflt=y
 if $sh -c "$cc -o try $optimize $ccflags $ldflags try.c $libs" >>try.msg 2>&1; then
-	if $sh -c './try' >>try.msg 2>&1; then
-		xxx=`./try`
+	if $sh -c "$run ./try" >>try.msg 2>&1; then
+		xxx=`$run ./try`
 		case "$xxx" in
 		"Ok") dflt=n ;;
 		*)	echo 'The program compiled OK, but produced no output.' >> try.msg
@@ -4244,62 +4395,6 @@ n) echo "OK, that should do.";;
 esac
 $rm -f try try.* core
 
-: define an is-a-typedef? function
-typedef='type=$1; var=$2; def=$3; shift; shift; shift; inclist=$@;
-case "$inclist" in
-"") inclist="sys/types.h";;
-esac;
-eval "varval=\$$var";
-case "$varval" in
-"")
-	$rm -f temp.c;
-	for inc in $inclist; do
-		echo "#include <$inc>" >>temp.c;
-	done;
-	echo "#ifdef $type" >> temp.c;
-	echo "printf(\"We have $type\");" >> temp.c;
-	echo "#endif" >> temp.c;
-	$cppstdin $cppflags $cppminus < temp.c >temp.E 2>/dev/null;
-	if $contains $type temp.E >/dev/null 2>&1; then
-		eval "$var=\$type";
-	else
-		eval "$var=\$def";
-	fi;
-	$rm -f temp.?;;
-*) eval "$var=\$varval";;
-esac'
-
-: define an is-a-typedef? function that prompts if the type is not available.
-typedef_ask='type=$1; var=$2; def=$3; shift; shift; shift; inclist=$@;
-case "$inclist" in
-"") inclist="sys/types.h";;
-esac;
-eval "varval=\$$var";
-case "$varval" in
-"")
-	$rm -f temp.c;
-	for inc in $inclist; do
-		echo "#include <$inc>" >>temp.c;
-	done;
-	echo "#ifdef $type" >> temp.c;
-	echo "printf(\"We have $type\");" >> temp.c;
-	echo "#endif" >> temp.c;
-	$cppstdin $cppflags $cppminus < temp.c >temp.E 2>/dev/null;
-	echo " " ;
-	echo "$rp" | $sed -e "s/What is/Looking for/" -e "s/?/./";
-	if $contains $type temp.E >/dev/null 2>&1; then
-		echo "$type found." >&4;
-		eval "$var=\$type";
-	else
-		echo "$type NOT found." >&4;
-		dflt="$def";
-		. ./myread ;
-		eval "$var=\$ans";
-	fi;
-	$rm -f temp.?;;
-*) eval "$var=\$varval";;
-esac'
-
 : define a shorthand compile call
 compile='
 mc_file=$1;
@@ -4311,13 +4406,130 @@ mc_file=$1;
 shift;
 $cc -o ${mc_file} $optimize $ccflags $ldflags $* ${mc_file}.c $libs;'
 
+: determine filename position in cpp output
+echo " "
+echo "Computing filename position in cpp output for #include directives..." >&4
+case "$osname" in
+vos) testaccess=-e ;;
+*)   testaccess=-r ;;
+esac
+echo '#include <stdio.h>' > foo.c
+$cat >fieldn <<EOF
+$startsh
+$cppstdin $cppflags $cppminus <foo.c 2>/dev/null | \
+$grep '^[ 	]*#.*stdio\.h' | \
+while read cline; do
+	pos=1
+	set \$cline
+	while $test \$# -gt 0; do
+		if $test $testaccess \`echo \$1 | $tr -d '"'\`; then
+			echo "\$pos"
+			exit 0
+		fi
+		shift
+		pos=\`expr \$pos + 1\`
+	done
+done
+EOF
+chmod +x fieldn
+fieldn=`./fieldn`
+$rm -f foo.c fieldn
+case $fieldn in
+'') pos='???';;
+1) pos=first;;
+2) pos=second;;
+3) pos=third;;
+*) pos="${fieldn}th";;
+esac
+echo "Your cpp writes the filename in the $pos field of the line."
+
+case "$osname" in
+vos) cppfilter="tr '\\\\>' '/' |" ;; # path component separator is >
+*)   cppfilter='' ;;
+esac
+: locate header file
+$cat >findhdr <<EOF
+$startsh
+wanted=\$1
+name=''
+for usrincdir in $usrinc
+do
+	if test -f \$usrincdir/\$wanted; then
+		echo "\$usrincdir/\$wanted"
+		exit 0
+	fi
+done
+awkprg='{ print \$$fieldn }'
+echo "#include <\$wanted>" > foo\$\$.c
+$cppstdin $cppminus $cppflags < foo\$\$.c 2>/dev/null | \
+$cppfilter $grep "^[ 	]*#.*\$wanted" | \
+while read cline; do
+	name=\`echo \$cline | $awk "\$awkprg" | $tr -d '"'\`
+	case "\$name" in
+	*[/\\\\]\$wanted) echo "\$name"; exit 1;;
+	*[\\\\/]\$wanted) echo "\$name"; exit 1;;
+	*) exit 2;;
+	esac;
+done;
+#
+# status = 0: grep returned 0 lines, case statement not executed
+# status = 1: headerfile found
+# status = 2: while loop executed, no headerfile found
+#
+status=\$?
+$rm -f foo\$\$.c;
+if test \$status -eq 1; then
+	exit 0;
+fi
+exit 1
+EOF
+chmod +x findhdr
+
+: define an alternate in-header-list? function
+inhdr='echo " "; td=$define; tu=$undef; yyy=$@;
+cont=true; xxf="echo \"<\$1> found.\" >&4";
+case $# in 2) xxnf="echo \"<\$1> NOT found.\" >&4";;
+*) xxnf="echo \"<\$1> NOT found, ...\" >&4";;
+esac;
+case $# in 4) instead=instead;; *) instead="at last";; esac;
+while $test "$cont"; do
+	xxx=`./findhdr $1`
+	var=$2; eval "was=\$$2";
+	if $test "$xxx" && $test -r "$xxx";
+	then eval $xxf;
+	eval "case \"\$$var\" in $undef) . ./whoa; esac"; eval "$var=\$td";
+		cont="";
+	else eval $xxnf;
+	eval "case \"\$$var\" in $define) . ./whoa; esac"; eval "$var=\$tu"; fi;
+	set $yyy; shift; shift; yyy=$@;
+	case $# in 0) cont="";;
+	2) xxf="echo \"but I found <\$1> $instead.\" >&4";
+		xxnf="echo \"and I did not find <\$1> either.\" >&4";;
+	*) xxf="echo \"but I found <\$1\> instead.\" >&4";
+		xxnf="echo \"there is no <\$1>, ...\" >&4";;
+	esac;
+done;
+while $test "$yyy";
+do set $yyy; var=$2; eval "was=\$$2";
+	eval "case \"\$$var\" in $define) . ./whoa; esac"; eval "$var=\$tu";
+	set $yyy; shift; shift; yyy=$@;
+done'
+
+: see if stdlib is available
+set stdlib.h i_stdlib
+eval $inhdr
+
 : check for lengths of integral types
 echo " "
 case "$intsize" in
 '')
 	echo "Checking to see how big your integers are..." >&4
-	$cat >intsize.c <<'EOCP'
+	$cat >try.c <<EOCP
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main()
 {
 	printf("intsize=%d;\n", (int)sizeof(int));
@@ -4326,9 +4538,9 @@ int main()
 	exit(0);
 }
 EOCP
-	set intsize
-	if eval $compile_ok && ./intsize > /dev/null; then
-		eval `./intsize`
+	set try
+	if eval $compile_ok && $run ./try > /dev/null; then
+		eval `$run ./try`
 		echo "Your integers are $intsize bytes long."
 		echo "Your long integers are $longsize bytes long."
 		echo "Your short integers are $shortsize bytes long."
