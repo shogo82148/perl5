@@ -8646,6 +8646,7 @@ else
 		val="$undef"
 		val2="$undef"
 fi
+$rm -f try try.*
 set d_vprintf
 eval $setvar
 val=$val2
@@ -11804,10 +11805,14 @@ echo " "
 : see if we have sigaction
 if set sigaction val -f d_sigaction; eval $csym; $val; then
 	echo 'sigaction() found.' >&4
-	$cat > try.c <<'EOP'
+	$cat > try.c <<EOP
 #include <stdio.h>
 #include <sys/types.h>
 #include <signal.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main()
 {
     struct sigaction act, oact;
@@ -11835,8 +11840,12 @@ $rm -f try try$_o try.c
 echo " "
 case "$d_sigsetjmp" in
 '')
-	$cat >try.c <<'EOP'
+	$cat >try.c <<EOP
 #include <setjmp.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 sigjmp_buf env;
 int set = 1;
 int main()
@@ -11850,7 +11859,7 @@ int main()
 EOP
 	set try
 	if eval $compile; then
-		if ./try >/dev/null 2>&1; then
+		if $run ./try >/dev/null 2>&1; then
 			echo "POSIX sigsetjmp found." >&4
 			val="$define"
 		else
@@ -12659,7 +12668,7 @@ int main()
 EOCP
 		set try
 		if eval $compile_ok; then
-			dflt=`./try`
+			dflt=`$run ./try`
 		else
 			dflt='8'
 			echo "(I can't seem to compile the test program...)"
@@ -12801,14 +12810,24 @@ $define)
 #endif
 #include <sys/types.h>
 #include <stdio.h>
-#include <db.h>
-int main()
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
+#include <db3/db.h>
+int main(int argc, char *argv[])
 {
 #ifdef DB_VERSION_MAJOR	/* DB version >= 2 */
     int Major, Minor, Patch ;
     unsigned long Version ;
     (void)db_version(&Major, &Minor, &Patch) ;
-    printf("You have Berkeley DB Version 2 or greater\n");
+    if (argc == 2) {
+        printf("%d %d %d %d %d %d\n",
+               DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH,
+               Major, Minor, Patch);
+        exit(0);
+    }
+    printf("You have Berkeley DB Version 2 or greater.\n");
 
     printf("db.h is from Berkeley DB Version %d.%d.%d\n",
 		DB_VERSION_MAJOR, DB_VERSION_MINOR, DB_VERSION_PATCH);
@@ -12817,11 +12836,11 @@ int main()
 
     /* check that db.h & libdb are compatible */
     if (DB_VERSION_MAJOR != Major || DB_VERSION_MINOR != Minor || DB_VERSION_PATCH != Patch) {
-	printf("db.h and libdb are incompatible\n") ;
+	printf("db.h and libdb are incompatible.\n") ;
         exit(3);	
     }
 
-    printf("db.h and libdb are compatible\n") ;
+    printf("db.h and libdb are compatible.\n") ;
 
     Version = DB_VERSION_MAJOR * 1000000 + DB_VERSION_MINOR * 1000
 		+ DB_VERSION_PATCH ;
@@ -12829,26 +12848,34 @@ int main()
     /* needs to be >= 2.3.4 */
     if (Version < 2003004) {
     /* if (DB_VERSION_MAJOR == 2 && DB_VERSION_MINOR == 0 && DB_VERSION_PATCH < 5) { */
-	printf("but Perl needs Berkeley DB 2.3.4 or greater\n") ;
+	printf("Perl needs Berkeley DB 2.3.4 or greater.\n") ;
         exit(2);	
     }
 
     exit(0);
 #else
 #if defined(_DB_H_) && defined(BTREEMAGIC) && defined(HASHMAGIC)
-    printf("You have Berkeley DB Version 1\n");
+    if (argc == 2) {
+        printf("1 0 0\n");
+        exit(0);
+    }
+    printf("You have Berkeley DB Version 1.\n");
     exit(0);	/* DB version < 2: the coast is clear. */
 #else
-    exit(1);	/* <db.h> not Berkeley DB? */
+    exit(1);	/* <db3/db.h> not Berkeley DB? */
 #endif
 #endif
 }
 EOCP
 	set try
-	if eval $compile_ok && ./try; then
+	if eval $compile_ok && $run ./try; then
 		echo 'Looks OK.' >&4
+		set `$run ./try 1`
+		db_version_major=$1
+		db_version_minor=$2
+		db_version_patch=$3
 	else
-		echo "I can't use Berkeley DB with your <db.h>.  I'll disable Berkeley DB." >&4
+		echo "I can't use Berkeley DB with your <db3/db.h>.  I'll disable Berkeley DB." >&4
 		i_db=$undef
 		case " $libs " in
 		*"-ldb "*)
@@ -12876,7 +12903,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 u_int32_t hash_cb (ptr, size)
@@ -12921,7 +12948,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 size_t prefix_cb (key1, key2)
@@ -13125,6 +13152,10 @@ sunos) $echo '#define PERL_FFLUSH_ALL_FOPEN_MAX 32' > try.c ;;
 esac
 $cat >>try.c <<EOCP
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 #$i_unistd I_UNISTD
 #ifdef I_UNISTD
 # include <unistd.h>
@@ -13135,7 +13166,9 @@ $cat >>try.c <<EOCP
 # define STDIO_STREAM_ARRAY $stdio_stream_array
 #endif
 int main() {
-  FILE* p = fopen("try.out", "w");
+  FILE* p;
+  unlink("try.out");
+  p = fopen("try.out", "w");
 #ifdef TRY_FPUTC
   fputc('x', p);
 #else
@@ -13184,24 +13217,26 @@ int main() {
 }
 EOCP
 : first we have to find out how _not_ to flush
+$to try.c
 if $test "X$fflushNULL" = X -o "X$fflushall" = X; then
     output=''
     set try -DTRY_FPUTC
     if eval $compile; then
-	    $rm -f try.out
- 	    ./try$exe_ext 2>/dev/null
-	    if $test ! -s try.out -a "X$?" = X42; then
+ 	    $run ./try 2>/dev/null
+	    code="$?"
+	    $from try.out
+	    if $test ! -s try.out -a "X$code" = X42; then
 		output=-DTRY_FPUTC
 	    fi
     fi
     case "$output" in
     '')
 	    set try -DTRY_FPRINTF
-	    $rm -f try.out
 	    if eval $compile; then
-		    $rm -f try.out
- 		    ./try$exe_ext 2>/dev/null
-		    if $test ! -s try.out -a "X$?" = X42; then
+ 		    $run ./try 2>/dev/null
+		    code="$?"
+		    $from try.out
+		    if $test ! -s try.out -a "X$code" = X42; then
 			output=-DTRY_FPRINTF
 		    fi
 	    fi
@@ -13212,9 +13247,9 @@ fi
 case "$fflushNULL" in
 '') 	set try -DTRY_FFLUSH_NULL $output
 	if eval $compile; then
-	        $rm -f try.out
-	    	./try$exe_ext 2>/dev/null
+	    	$run ./try 2>/dev/null
 		code="$?"
+		$from try.out
 		if $test -s try.out -a "X$code" = X42; then
 			fflushNULL="`$cat try.out`"
 		else
@@ -13260,7 +13295,7 @@ EOCP
                 set tryp
                 if eval $compile; then
                     $rm -f tryp.out
-                    $cat tryp.c | ./tryp$exe_ext 2>/dev/null > tryp.out
+                    $cat tryp.c | $run ./tryp 2>/dev/null > tryp.out
                     if cmp tryp.c tryp.out >/dev/null 2>&1; then
                        $cat >&4 <<EOM
 fflush(NULL) seems to behave okay with input streams.
@@ -13436,6 +13471,10 @@ echo "Checking the size of $zzz..." >&4
 cat > try.c <<EOCP
 #include <sys/types.h>
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main() {
     printf("%d\n", (int)sizeof($gidtype));
     exit(0);
@@ -13443,7 +13482,7 @@ int main() {
 EOCP
 set try
 if eval $compile_ok; then
-	yyy=`./try`
+	yyy=`$run ./try`
 	case "$yyy" in
 	'')	gidsize=4
 		echo "(I can't execute the test program--guessing $gidsize.)" >&4
@@ -14056,7 +14095,11 @@ echo " "
 echo "Checking how to generate random libraries on your machine..." >&4
 echo 'int bar1() { return bar2(); }' > bar1.c
 echo 'int bar2() { return 2; }' > bar2.c
-$cat > foo.c <<'EOP'
+$cat > foo.c <<EOP
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main() { printf("%d\n", bar1()); exit(0); }
 EOP
 $cc $ccflags -c bar1.c >/dev/null 2>&1
@@ -14064,13 +14107,13 @@ $cc $ccflags -c bar2.c >/dev/null 2>&1
 $cc $ccflags -c foo.c >/dev/null 2>&1
 $ar rc bar$_a bar2$_o bar1$_o >/dev/null 2>&1
 if $cc -o foobar $ccflags $ldflags foo$_o bar$_a $libs > /dev/null 2>&1 &&
-	./foobar >/dev/null 2>&1; then
+	$run ./foobar >/dev/null 2>&1; then
 	echo "$ar appears to generate random libraries itself."
 	orderlib=false
 	ranlib=":"
 elif $ar ts bar$_a >/dev/null 2>&1 &&
 	$cc -o foobar $ccflags $ldflags foo$_o bar$_a $libs > /dev/null 2>&1 &&
-	./foobar >/dev/null 2>&1; then
+	$run ./foobar >/dev/null 2>&1; then
 		echo "a table of contents needs to be added with '$ar ts'."
 		orderlib=false
 		ranlib="$ar ts"
@@ -14178,25 +14221,31 @@ EOM
 #   include <sys/socket.h> /* Might include <sys/bsdtypes.h> */
 #endif
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 $selecttype b;
 #define S sizeof(*(b))
 #define MINBITS	64
 #define NBYTES (S * 8 > MINBITS ? S : MINBITS/8)
 #define NBITS  (NBYTES * 8)
 int main() {
-    char s[NBYTES];
+    char *s = malloc(NBYTES);
     struct timeval t;
     int i;
     FILE* fp;
     int fd;
 
+    if (!s)
+	exit(1);
     fclose(stdin);
     fp = fopen("try.c", "r");
     if (fp == 0)
-      exit(1);
+      exit(2);
     fd = fileno(fp);
     if (fd < 0)
-      exit(2);
+      exit(3);
     b = ($selecttype)s;
     for (i = 0; i < NBITS; i++)
 	FD_SET(i, b);
@@ -14204,20 +14253,21 @@ int main() {
     t.tv_usec = 0;
     select(fd + 1, b, 0, 0, &t);
     for (i = NBITS - 1; i > fd && FD_ISSET(i, b); i--);
+    free(s);
     printf("%d\n", i + 1);
     return 0;
 }
 EOCP
 		set try
 		if eval $compile_ok; then
-			selectminbits=`./try`
+			selectminbits=`$run ./try`
 			case "$selectminbits" in
 			'')	cat >&4 <<EOM
 Cannot figure out on how many bits at a time your select() operates.
-I'll play safe and guess it is 32 bits.
+I'll play safe and guess it is $safebits bits.
 EOM
-				selectminbits=32
-				bits="32 bits"
+				selectminbits=$safebits
+				bits="$safebits bits"
 				;;
 			1)	bits="1 bit" ;;
 			*)	bits="$selectminbits bits" ;;
@@ -14226,7 +14276,8 @@ EOM
 		else
 			rp='What is the minimum number of bits your select() operates on?'
 			case "$byteorder" in
-			1234|12345678)	dflt=32 ;;
+			12345678)	dflt=64 ;;
+			1234)		dflt=32 ;;
 			*)		dflt=1	;;
 			esac
 			. ./myread
@@ -14236,7 +14287,7 @@ EOM
 		$rm -f try.* try
 		;;
 	*)	: no select, so pick a harmless default
-		selectminbits='32'
+		selectminbits=$safebits
 		;;
 	esac
 	;;
@@ -14283,9 +14334,13 @@ xxx="$xxx SYS TERM THAW TRAP TSTP TTIN TTOU URG USR1 USR2"
 xxx="$xxx USR3 USR4 VTALRM WAITING WINCH WIND WINDOW XCPU XFSZ"
 
 : generate a few handy files for later
-$cat > signal.c <<'EOCP'
+$cat > signal.c <<EOCP
 #include <sys/types.h>
 #include <signal.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 #include <stdio.h>
 int main() {
 
@@ -14512,6 +14567,10 @@ echo "Checking the size of $zzz..." >&4
 cat > try.c <<EOCP
 #include <sys/types.h>
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main() {
     printf("%d\n", (int)sizeof($sizetype));
     exit(0);
@@ -14519,7 +14578,7 @@ int main() {
 EOCP
 set try
 if eval $compile_ok; then
-	yyy=`./try`
+	yyy=`$run ./try`
 	case "$yyy" in
 	'')	sizesize=4
 		echo "(I can't execute the test program--guessing $sizesize.)" >&4
@@ -14613,8 +14672,12 @@ esac
 set ssize_t ssizetype int stdio.h sys/types.h
 eval $typedef
 dflt="$ssizetype"
-$cat > ssize.c <<EOM
+$cat > try.c <<EOM
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 #include <sys/types.h>
 #define Size_t $sizetype
 #define SSize_t $dflt
@@ -14630,9 +14693,9 @@ int main()
 }
 EOM
 echo " "
-set ssize
-if eval $compile_ok && ./ssize > /dev/null; then
-	ssizetype=`./ssize`
+set try
+if eval $compile_ok && $run ./try > /dev/null; then
+	ssizetype=`$run ./try`
 	echo "I'll be using $ssizetype for functions returning a byte count." >&4
 else
 	$cat >&4 <<EOM
@@ -14648,7 +14711,7 @@ EOM
 	. ./myread
 	ssizetype="$ans"
 fi
-$rm -f ssize ssize.*
+$rm -f try try.*
 
 : see what type of char stdio uses.
 echo " "
@@ -14713,6 +14776,10 @@ echo "Checking the size of $zzz..." >&4
 cat > try.c <<EOCP
 #include <sys/types.h>
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main() {
     printf("%d\n", (int)sizeof($uidtype));
     exit(0);
@@ -14720,7 +14787,7 @@ int main() {
 EOCP
 set try
 if eval $compile_ok; then
-	yyy=`./try`
+	yyy=`$run ./try`
 	case "$yyy" in
 	'')	uidsize=4
 		echo "(I can't execute the test program--guessing $uidsize.)" >&4
