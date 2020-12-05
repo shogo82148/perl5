@@ -9305,6 +9305,35 @@ case "$i_string" in
 *)	  strings=`./findhdr string.h`;;
 esac
 
+: see if fcntl.h is there
+val=''
+set fcntl.h val
+eval $inhdr
+
+: see if we can include fcntl.h
+case "$val" in
+"$define")
+	echo " "
+	if $h_fcntl; then
+		val="$define"
+		echo "We'll be including <fcntl.h>." >&4
+	else
+		val="$undef"
+		if $h_sysfile; then
+	echo "We don't need to include <fcntl.h> if we include <sys/file.h>." >&4
+		else
+			echo "We won't be including <fcntl.h>." >&4
+		fi
+	fi
+	;;
+*)
+	h_fcntl=false
+	val="$undef"
+	;;
+esac
+set i_fcntl
+eval $setvar
+
 : check for non-blocking I/O stuff
 case "$h_sysfile" in
 true) echo "#include <sys/file.h>" > head.c;;
@@ -15291,35 +15320,6 @@ case "$val" in
 	;;
 esac
 set i_sysfile
-eval $setvar
-
-: see if fcntl.h is there
-val=''
-set fcntl.h val
-eval $inhdr
-
-: see if we can include fcntl.h
-case "$val" in
-"$define")
-	echo " "
-	if $h_fcntl; then
-		val="$define"
-		echo "We'll be including <fcntl.h>." >&4
-	else
-		val="$undef"
-		if $h_sysfile; then
-	echo "We don't need to include <fcntl.h> if we include <sys/file.h>." >&4
-		else
-			echo "We won't be including <fcntl.h>." >&4
-		fi
-	fi
-	;;
-*)
-	h_fcntl=false
-	val="$undef"
-	;;
-esac
-set i_fcntl
 eval $setvar
 
 : see if this is a ieeefp.h system
