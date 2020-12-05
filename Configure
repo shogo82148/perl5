@@ -5089,7 +5089,7 @@ esac
 
 echo " "
 echo "Checking for GNU C Library..." >&4
-cat >gnulibc.c <<EOM
+cat >try.c <<'EOCP'
 /* Find out version of GNU C library.  __GLIBC__ and __GLIBC_MINOR__
    alone are insufficient to distinguish different versions, such as
    2.0.6 and 2.0.7.  The function gnu_get_libc_version() appeared in
@@ -5113,7 +5113,8 @@ int main(void)
 #else
     return 1;
 #endif
-EOM
+}
+EOCP
 set gnulibc
 if eval $compile_ok && ./gnulibc; then
 	val="$define"
