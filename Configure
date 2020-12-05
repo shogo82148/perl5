@@ -3158,7 +3158,7 @@ else
 fi
 $rm -f gccvers*
 case "$gccversion" in
-1*) cpp=`./loc gcc-cpp $cpp $pth` ;;
+1.*) cpp=`./loc gcc-cpp $cpp $pth` ;;
 esac
 case "$gccversion" in
 '') gccosandvers='' ;;
@@ -3626,13 +3626,29 @@ EOSC
 # gcc 3.1 complains about adding -Idirectories that it already knows about,
 # so we will take those off from locincpth.
 case "$gccversion" in
-3*)
+3.*)
     echo "main(){}">try.c
     for incdir in `$cc -v -c try.c 2>&1 | \
        sed '1,/^#include <\.\.\.>/d;/^End of search list/,$d;s/^ //'` ; do
        locincpth=`echo $locincpth | sed s!$incdir!!`
     done
     $rm -f try try.*
+esac
+
+# gcc 4.9 by default does some optimizations that break perl.
+# see ticket 121505.
+#
+# The -fwrapv disables those optimizations (and probably others,) so
+# for gcc 4.9 (and later, since the optimizations probably won't go
+# away), add -fwrapv unless the user requests -fno-wrapv, which
+# disables -fwrapv, or if the user requests -fsanitize=undefined,
+# which turns the overflows -fwrapv ignores into runtime errors.
+case "$gccversion" in
+4.[3-9].*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9]*)
+    case "$ccflags" in
+    *-fno-wrapv*|*-fsanitize=undefined*|*-fwrapv*) ;;
+    *) ccflags="$ccflags -fwrapv" ;;
+    esac
 esac
 
 : What should the include directory be ?
@@ -3944,13 +3960,13 @@ dflt=''
 case "$hint" in
 default|recommended)
 	case "$gccversion" in
-	1*) dflt='-fpcc-struct-return' ;;
+	1.*) dflt='-fpcc-struct-return' ;;
 	esac
 	case "$optimize" in
 	*-g*) dflt="$dflt -DDEBUGGING";;
 	esac
 	case "$gccversion" in
-	2*) if test -d /etc/conf/kconfig.d &&
+	2.*) if test -d /etc/conf/kconfig.d &&
 			$contains _POSIX_VERSION $usrinc/sys/unistd.h >/dev/null 2>&1
 		then
 			dflt="$dflt -posix"
@@ -3958,7 +3974,7 @@ default|recommended)
 		;;
 	esac
 	case "$gccversion" in
-	1*) ;;
+	1.*) ;;
 	2.[0-8]*) ;;
 	?*) 	echo " "
 		echo "Checking if your compiler accepts -fno-strict-aliasing" 2>&1
@@ -4049,7 +4065,7 @@ esac
 : the following weeds options from ccflags that are of no interest to cpp
 cppflags="$ccflags"
 case "$gccversion" in
-1*) cppflags="$cppflags -D__GNUC__"
+1.*) cppflags="$cppflags -D__GNUC__"
 esac
 case "$mips_type" in
 '');;
@@ -7851,6 +7867,21 @@ int main()
 	Gconvert((DOUBLETYPE)0.1, 8, 0, buf);
 	checkit("0.1", buf);
 
+	Gconvert((DOUBLETYPE)0.01, 8, 0, buf);
+	checkit("0.01", buf);
+
+	Gconvert((DOUBLETYPE)0.001, 8, 0, buf);
+	checkit("0.001", buf);
+
+	Gconvert((DOUBLETYPE)0.0001, 8, 0, buf);
+	checkit("0.0001", buf);
+
+	Gconvert((DOUBLETYPE)0.00009, 8, 0, buf);
+	if (strlen(buf) > 5)
+	    checkit("9e-005", buf); /* for Microsoft ?? */
+	else
+	    checkit("9e-05", buf);
+
 	Gconvert((DOUBLETYPE)1.0, 8, 0, buf); 
 	checkit("1", buf);
 
@@ -7888,6 +7919,19 @@ int main()
 
 	Gconvert((DOUBLETYPE)123.456, 8, 0, buf); 
 	checkit("123.456", buf);
+
+	/* Testing of 1e+129 in bigintpm.t must not get extra '.' here. */
+	Gconvert((DOUBLETYPE)1e34, 8, 0, buf);
+	/* 34 should be enough to scare even long double
+	 * places into using the e notation. */
+	if (strlen(buf) > 5)
+	    checkit("1e+034", buf); /* for Microsoft */
+	else
+	    checkit("1e+34", buf);
+
+	/* For Perl, if you add additional tests here, also add them to
+	 * t/base/num.t for benefit of platforms not using Configure or
+	 * overriding d_Gconvert */
 
 	exit(0);
 }
@@ -14249,7 +14293,7 @@ $cat >>signal_cmd <<'EOS'
 
 set signal
 if eval $compile_ok; then
-	./signal$_exe | $sort -n +1 | $uniq | $awk -f signal.awk >signal.lst
+	./signal$_exe | ($sort -n -k 2 2>/dev/null || $sort -n +1) | $uniq | $awk -f signal.awk >signal.lst
 else
 	echo "(I can't seem be able to compile the whole test program)" >&4
 	echo "(I'll try it in little pieces.)" >&4
@@ -14283,7 +14327,7 @@ EOCP
 	done
 	if $test -s signal.ls1; then
 		$cat signal.nsg signal.ls1 |
-			$sort -n +1 | $uniq | $awk -f signal.awk >signal.lst
+			($sort -n -k 2 2>/dev/null || $sort -n +1) | $uniq | $awk -f signal.awk >signal.lst
 	fi
 
 fi
