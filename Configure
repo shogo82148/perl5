@@ -5453,8 +5453,12 @@ echo " "
 case "$doublesize" in
 '')
 	echo "Checking to see how big your double precision numbers are..." >&4
-	$cat >try.c <<'EOCP'
+	$cat >try.c <<EOCP
 #include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
 int main()
 {
     printf("%d\n", (int)sizeof(double));
@@ -5463,7 +5467,7 @@ int main()
 EOCP
 	set try
 	if eval $compile_ok; then
-		doublesize=`./try`
+		doublesize=`$run ./try`
 		echo "Your double is $doublesize bytes long."
 	else
 		dflt='8'
@@ -6025,107 +6029,6 @@ esac
 set d_dosuid
 eval $setvar
 
-: determine filename position in cpp output
-echo " "
-echo "Computing filename position in cpp output for #include directives..." >&4
-echo '#include <stdio.h>' > foo.c
-$cat >fieldn <<EOF
-$startsh
-$cppstdin $cppflags $cppminus <foo.c 2>/dev/null | \
-$grep '^[ 	]*#.*stdio\.h' | \
-while read cline; do
-	pos=1
-	set \$cline
-	while $test \$# -gt 0; do
-		if $test -r \`echo \$1 | $tr -d '"'\`; then
-			echo "\$pos"
-			exit 0
-		fi
-		shift
-		pos=\`expr \$pos + 1\`
-	done
-done
-EOF
-chmod +x fieldn
-fieldn=`./fieldn`
-$rm -f foo.c fieldn
-case $fieldn in
-'') pos='???';;
-1) pos=first;;
-2) pos=second;;
-3) pos=third;;
-*) pos="${fieldn}th";;
-esac
-echo "Your cpp writes the filename in the $pos field of the line."
-
-: locate header file
-$cat >findhdr <<EOF
-$startsh
-wanted=\$1
-name=''
-for usrincdir in $usrinc
-do
-	if test -f \$usrincdir/\$wanted; then
-		echo "\$usrincdir/\$wanted"
-		exit 0
-	fi
-done
-awkprg='{ print \$$fieldn }'
-echo "#include <\$wanted>" > foo\$\$.c
-$cppstdin $cppminus $cppflags < foo\$\$.c 2>/dev/null | \
-$grep "^[ 	]*#.*\$wanted" | \
-while read cline; do
-	name=\`echo \$cline | $awk "\$awkprg" | $tr -d '"'\`
-	case "\$name" in
-	*[/\\\\]\$wanted) echo "\$name"; exit 1;;
-	*[\\\\/]\$wanted) echo "\$name"; exit 1;;
-	*) exit 2;;
-	esac;
-done;
-#
-# status = 0: grep returned 0 lines, case statement not executed
-# status = 1: headerfile found
-# status = 2: while loop executed, no headerfile found
-#
-status=\$?
-$rm -f foo\$\$.c;
-if test \$status -eq 1; then
-	exit 0;
-fi
-exit 1
-EOF
-chmod +x findhdr
-
-: define an alternate in-header-list? function
-inhdr='echo " "; td=$define; tu=$undef; yyy=$@;
-cont=true; xxf="echo \"<\$1> found.\" >&4";
-case $# in 2) xxnf="echo \"<\$1> NOT found.\" >&4";;
-*) xxnf="echo \"<\$1> NOT found, ...\" >&4";;
-esac;
-case $# in 4) instead=instead;; *) instead="at last";; esac;
-while $test "$cont"; do
-	xxx=`./findhdr $1`
-	var=$2; eval "was=\$$2";
-	if $test "$xxx" && $test -r "$xxx";
-	then eval $xxf;
-	eval "case \"\$$var\" in $undef) . ./whoa; esac"; eval "$var=\$td";
-		cont="";
-	else eval $xxnf;
-	eval "case \"\$$var\" in $define) . ./whoa; esac"; eval "$var=\$tu"; fi;
-	set $yyy; shift; shift; yyy=$@;
-	case $# in 0) cont="";;
-	2) xxf="echo \"but I found <\$1> $instead.\" >&4";
-		xxnf="echo \"and I did not find <\$1> either.\" >&4";;
-	*) xxf="echo \"but I found <\$1\> instead.\" >&4";
-		xxnf="echo \"there is no <\$1>, ...\" >&4";;
-	esac;
-done;
-while $test "$yyy";
-do set $yyy; var=$2; eval "was=\$$2";
-	eval "case \"\$$var\" in $define) . ./whoa; esac"; eval "$var=\$tu";
-	set $yyy; shift; shift; yyy=$@;
-done'
-
 : see if this is a malloc.h system
 : we want a real compile instead of Inhdr because some systems have a
 : malloc.h that just gives a compile error saying to use stdlib.h instead
@@ -6147,15 +6050,176 @@ $rm -f try.c try
 set i_malloc
 eval $setvar
 
-: see if stdlib is available
-set stdlib.h i_stdlib
-eval $inhdr
+: check for void type
+echo " "
+echo "Checking to see how well your C compiler groks the void type..." >&4
+case "$voidflags" in
+'')
+	$cat >try.c <<EOCP
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
+#if TRY & 1
+void sub() {
+#else
+sub() {
+#endif
+	extern void moo();	/* function returning void */
+	void (*goo)();		/* ptr to func returning void */
+#if TRY & 8
+	void *hue;		/* generic ptr */
+#endif
+#if TRY & 2
+	void (*foo[10])();
+#endif
+
+#if TRY & 4
+	if(goo == moo) {
+		exit(0);
+	}
+#endif
+	exit(0);
+}
+int main() { sub(); }
+EOCP
+	if $cc $ccflags -c -DTRY=$defvoidused try.c >.out 2>&1 ; then
+		voidflags=$defvoidused
+	echo "Good.  It appears to support void to the level $package wants.">&4
+		if $contains warning .out >/dev/null 2>&1; then
+			echo "However, you might get some warnings that look like this:"
+			$cat .out
+		fi
+	else
+echo "Hmm, your compiler has some difficulty with void. Checking further..." >&4
+		if $cc $ccflags -c -DTRY=1 try.c >/dev/null 2>&1; then
+			echo "It supports 1..."
+			if $cc $ccflags -c -DTRY=3 try.c >/dev/null 2>&1; then
+				echo "It also supports 2..."
+				if $cc $ccflags -c -DTRY=7 try.c >/dev/null 2>&1; then
+					voidflags=7
+					echo "And it supports 4 but not 8 definitely."
+				else
+					echo "It doesn't support 4..."
+					if $cc $ccflags -c -DTRY=11 try.c >/dev/null 2>&1; then
+						voidflags=11
+						echo "But it supports 8."
+					else
+						voidflags=3
+						echo "Neither does it support 8."
+					fi
+				fi
+			else
+				echo "It does not support 2..."
+				if $cc $ccflags -c -DTRY=13 try.c >/dev/null 2>&1; then
+					voidflags=13
+					echo "But it supports 4 and 8."
+				else
+					if $cc $ccflags -c -DTRY=5 try.c >/dev/null 2>&1; then
+						voidflags=5
+						echo "And it supports 4 but has not heard about 8."
+					else
+						echo "However it supports 8 but not 4."
+					fi
+				fi
+			fi
+		else
+			echo "There is no support at all for void."
+			voidflags=0
+		fi
+	fi
+esac
+case "$voidflags" in
+"$defvoidused") ;;
+*)	$cat >&4 <<'EOM'
+  Support flag bits are:
+    1: basic void declarations.
+    2: arrays of pointers to functions returning void.
+    4: operations between pointers to and addresses of void functions.
+    8: generic void pointers.
+EOM
+	dflt="$voidflags";
+	rp="Your void support flags add up to what?"
+	. ./myread
+	voidflags="$ans"
+	;;
+esac
+$rm -f try.* .out
+
+: check for length of pointer
+echo " "
+case "$ptrsize" in
+'')
+	echo "Checking to see how big your pointers are..." >&4
+	if test "$voidflags" -gt 7; then
+		echo '#define VOID_PTR char *' > try.c
+	else
+		echo '#define VOID_PTR void *' > try.c
+	fi
+	$cat >>try.c <<EOCP
+#include <stdio.h>
+#$i_stdlib I_STDLIB
+#ifdef I_STDLIB
+#include <stdlib.h>
+#endif
+int main()
+{
+    printf("%d\n", (int)sizeof(VOID_PTR));
+    exit(0);
+}
+EOCP
+	set try
+	if eval $compile_ok; then
+		ptrsize=`$run ./try`
+		echo "Your pointers are $ptrsize bytes long."
+	else
+		dflt='4'
+		echo "(I can't seem to compile the test program.  Guessing...)" >&4
+		rp="What is the size of a pointer (in bytes)?"
+		. ./myread
+		ptrsize="$ans"
+	fi
+	;;
+esac
+$rm -f try.c try
+case "$use64bitall" in
+"$define"|true|[yY]*)
+	case "$ptrsize" in
+	4)	cat <<EOM >&4
+
+*** You have chosen a maximally 64-bit build,
+*** but your pointers are only 4 bytes wide.
+*** Please rerun Configure without -Duse64bitall.
+EOM
+		case "$d_quad" in
+		define)
+			cat <<EOM >&4
+*** Since you have quads, you could possibly try with -Duse64bitint.
+EOM
+			;;
+		esac
+		cat <<EOM >&4
+*** Cannot continue, aborting.
+
+EOM
+
+		exit 1
+		;;
+	esac
+	;;
+esac
+
 
 : determine which malloc to compile in
 echo " "
 case "$usemymalloc" in
-''|[yY]*|true|$define)	dflt='y' ;;
-*)	dflt='n' ;;
+[yY]*|true|$define)	dflt='y' ;;
+[nN]*|false|$undef)	dflt='n' ;;
+*)	case "$ptrsize" in
+	4) dflt='y' ;;
+	*) dflt='n' ;;
+esac
+	;;
 esac
 rp="Do you wish to attempt to use the malloc that comes with $package?"
 . ./myread
@@ -12970,98 +13034,6 @@ EOCP
 *)	db_prefixtype='size_t'
 	;;
 esac
-
-: check for void type
-echo " "
-echo "Checking to see how well your C compiler groks the void type..." >&4
-case "$voidflags" in
-'')
-	$cat >try.c <<'EOCP'
-#if TRY & 1
-void sub() {
-#else
-sub() {
-#endif
-	extern void moo();	/* function returning void */
-	void (*goo)();		/* ptr to func returning void */
-#if TRY & 8
-	void *hue;		/* generic ptr */
-#endif
-#if TRY & 2
-	void (*foo[10])();
-#endif
-
-#if TRY & 4
-	if(goo == moo) {
-		exit(0);
-	}
-#endif
-	exit(0);
-}
-int main() { sub(); }
-EOCP
-	if $cc $ccflags -c -DTRY=$defvoidused try.c >.out 2>&1 ; then
-		voidflags=$defvoidused
-	echo "Good.  It appears to support void to the level $package wants.">&4
-		if $contains warning .out >/dev/null 2>&1; then
-			echo "However, you might get some warnings that look like this:"
-			$cat .out
-		fi
-	else
-echo "Hmm, your compiler has some difficulty with void. Checking further..." >&4
-		if $cc $ccflags -c -DTRY=1 try.c >/dev/null 2>&1; then
-			echo "It supports 1..."
-			if $cc $ccflags -c -DTRY=3 try.c >/dev/null 2>&1; then
-				echo "It also supports 2..."
-				if $cc $ccflags -c -DTRY=7 try.c >/dev/null 2>&1; then
-					voidflags=7
-					echo "And it supports 4 but not 8 definitely."
-				else
-					echo "It doesn't support 4..."
-					if $cc $ccflags -c -DTRY=11 try.c >/dev/null 2>&1; then
-						voidflags=11
-						echo "But it supports 8."
-					else
-						voidflags=3
-						echo "Neither does it support 8."
-					fi
-				fi
-			else
-				echo "It does not support 2..."
-				if $cc $ccflags -c -DTRY=13 try.c >/dev/null 2>&1; then
-					voidflags=13
-					echo "But it supports 4 and 8."
-				else
-					if $cc $ccflags -c -DTRY=5 try.c >/dev/null 2>&1; then
-						voidflags=5
-						echo "And it supports 4 but has not heard about 8."
-					else
-						echo "However it supports 8 but not 4."
-					fi
-				fi
-			fi
-		else
-			echo "There is no support at all for void."
-			voidflags=0
-		fi
-	fi
-esac
-case "$voidflags" in
-"$defvoidused") ;;
-*)	$cat >&4 <<'EOM'
-  Support flag bits are:
-    1: basic void declarations.
-    2: arrays of pointers to functions returning void.
-    4: operations between pointers to and addresses of void functions.
-    8: generic void pointers.
-EOM
-	dflt="$voidflags";
-	rp="Your void support flags add up to what?"
-	. ./myread
-	voidflags="$ans"
-	;;
-esac
-$rm -f try.* .out
 
 
 : How can we generate normalized random numbers ?
