@@ -3815,7 +3815,7 @@ else
 fi
 $rm -f try try.*
 case "$gccversion" in
-1*) cpp=`./loc gcc-cpp $cpp $pth` ;;
+1.*) cpp=`./loc gcc-cpp $cpp $pth` ;;
 esac
 case "$gccversion" in
 '') gccosandvers='' ;;
@@ -3855,7 +3855,7 @@ esac
 # gcc 3.1 complains about adding -Idirectories that it already knows about,
 # so we will take those off from locincpth.
 case "$gccversion" in
-3*)
+3.*)
     echo "main(){}">try.c
     for incdir in `$cc -v -c try.c 2>&1 | \
        sed '1,/^#include <\.\.\.>/d;/^End of search list/,$d;s/^ //'` ; do
@@ -4145,6 +4145,22 @@ dflt="$orig_dflt"
 rm -f getfile.ok
 test "X$gfpthkeep" != Xy && gfpth=""
 EOSC
+
+# gcc 4.9 by default does some optimizations that break perl.
+# see ticket 121505.
+#
+# The -fwrapv disables those optimizations (and probably others,) so
+# for gcc 4.9 (and later, since the optimizations probably won't go
+# away), add -fwrapv unless the user requests -fno-wrapv, which
+# disables -fwrapv, or if the user requests -fsanitize=undefined,
+# which turns the overflows -fwrapv ignores into runtime errors.
+case "$gccversion" in
+4.[3-9].*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9]*)
+    case "$ccflags" in
+    *-fno-wrapv*|*-fsanitize=undefined*|*-fwrapv*) ;;
+    *) ccflags="$ccflags -fwrapv" ;;
+    esac
+esac
 
 : What should the include directory be ?
 echo " "
@@ -4583,13 +4599,13 @@ dflt=''
 case "$hint" in
 default|recommended)
 	case "$gccversion" in
-	1*) dflt='-fpcc-struct-return' ;;
+	1.*) dflt='-fpcc-struct-return' ;;
 	esac
 	case "$optimize" in
 	*-g*) dflt="$dflt -DDEBUGGING";;
 	esac
 	case "$gccversion" in
-	2*) if test -d /etc/conf/kconfig.d &&
+	2.*) if test -d /etc/conf/kconfig.d &&
 			$contains _POSIX_VERSION $usrinc/sys/unistd.h >/dev/null 2>&1
 		then
 			dflt="$dflt -posix"
@@ -4597,7 +4613,7 @@ default|recommended)
 		;;
 	esac
 	case "$gccversion" in
-	1*) ;;
+	1.*) ;;
 	2.[0-8]*) ;;
 	?*) 	echo " "
 		echo "Checking if your compiler accepts -fno-strict-aliasing" 2>&1
@@ -4691,7 +4707,7 @@ case "$cppflags" in
 *)  cppflags="$cppflags $ccflags" ;;
 esac
 case "$gccversion" in
-1*) cppflags="$cppflags -D__GNUC__"
+1.*) cppflags="$cppflags -D__GNUC__"
 esac
 case "$mips_type" in
 '');;
@@ -16595,7 +16611,7 @@ $define)
 #endif
 #include <sys/types.h>
 #include <stdio.h>
-#include <db.h>
+#include <db3/db.h>
 int main(int argc, char *argv[])
 {
 #ifdef DB_VERSION_MAJOR	/* DB version >= 2 */
@@ -16643,7 +16659,7 @@ int main(int argc, char *argv[])
     printf("You have Berkeley DB Version 1.\n");
     exit(0);	/* DB version < 2: the coast is clear. */
 #else
-    exit(1);	/* <db.h> not Berkeley DB? */
+    exit(1);	/* <db3/db.h> not Berkeley DB? */
 #endif
 #endif
 }
@@ -16656,7 +16672,7 @@ EOCP
 		db_version_minor=$2
 		db_version_patch=$3
 	else
-		echo "I can't use Berkeley DB with your <db.h>.  I'll disable Berkeley DB." >&4
+		echo "I can't use Berkeley DB with your <db3/db.h>.  I'll disable Berkeley DB." >&4
 		i_db=$undef
 		case " $libs " in
 		*"-ldb "*)
@@ -16684,7 +16700,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 u_int32_t hash_cb (ptr, size)
@@ -16729,7 +16745,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 size_t prefix_cb (key1, key2)

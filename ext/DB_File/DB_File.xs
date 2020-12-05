@@ -117,7 +117,7 @@
    DB_VERSION_PATCH_CFG here so that Configure pulls them all in. */
 
 /* Being the Berkeley DB we prefer the <sys/cdefs.h> (which will be
- * shortly #included by the <db.h>) __attribute__ to the possibly
+ * shortly #included by the <db3/db.h>) __attribute__ to the possibly
  * already defined __attribute__, for example by GNUC or by Perl. */
 
 /* #if DB_VERSION_MAJOR_CFG < 2  */
@@ -128,7 +128,7 @@
 #ifdef COMPAT185
 #    include <db_185.h>
 #else
-#    include <db.h>
+#    include <db3/db.h>
 #endif
 
 /* Wall starts with 5.7.x */
