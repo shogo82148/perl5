@@ -16830,7 +16830,7 @@ $define)
 #ifdef I_STDLIB
 #include <stdlib.h>
 #endif
-#include <db.h>
+#include <db3/db.h>
 int main(int argc, char *argv[])
 {
 #ifdef DB_VERSION_MAJOR	/* DB version >= 2 */
@@ -16878,7 +16878,7 @@ int main(int argc, char *argv[])
     printf("You have Berkeley DB Version 1.\n");
     exit(0);	/* DB version < 2: the coast is clear. */
 #else
-    exit(1);	/* <db.h> not Berkeley DB? */
+    exit(1);	/* <db3/db.h> not Berkeley DB? */
 #endif
 #endif
 }
@@ -16891,7 +16891,7 @@ EOCP
 		db_version_minor=$2
 		db_version_patch=$3
 	else
-		echo "I can't use Berkeley DB with your <db.h>.  I'll disable Berkeley DB." >&4
+		echo "I can't use Berkeley DB with your <db3/db.h>.  I'll disable Berkeley DB." >&4
 		i_db=$undef
 		case " $libs " in
 		*"-ldb "*)
@@ -16919,7 +16919,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 u_int32_t hash_cb (ptr, size)
@@ -16964,7 +16964,7 @@ define)
 #define const
 #endif
 #include <sys/types.h>
-#include <db.h>
+#include <db3/db.h>
 
 #ifndef DB_VERSION_MAJOR
 size_t prefix_cb (key1, key2)
