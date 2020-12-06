@@ -3158,7 +3158,7 @@ else
 fi
 $rm -f gccvers*
 case "$gccversion" in
-1.*) cpp=`./loc gcc-cpp $cpp $pth` ;;
+1*) cpp=`./loc gcc-cpp $cpp $pth` ;;
 esac
 case "$gccversion" in
 '') gccosandvers='' ;;
@@ -3626,7 +3626,7 @@ EOSC
 # gcc 3.1 complains about adding -Idirectories that it already knows about,
 # so we will take those off from locincpth.
 case "$gccversion" in
-3.*)
+3*)
     echo "main(){}">try.c
     for incdir in `$cc -v -c try.c 2>&1 | \
        sed '1,/^#include <\.\.\.>/d;/^End of search list/,$d;s/^ //'` ; do
@@ -3960,13 +3960,13 @@ dflt=''
 case "$hint" in
 default|recommended)
 	case "$gccversion" in
-	1.*) dflt='-fpcc-struct-return' ;;
+	1*) dflt='-fpcc-struct-return' ;;
 	esac
 	case "$optimize" in
 	*-g*) dflt="$dflt -DDEBUGGING";;
 	esac
 	case "$gccversion" in
-	2.*) if test -d /etc/conf/kconfig.d &&
+	2*) if test -d /etc/conf/kconfig.d &&
 			$contains _POSIX_VERSION $usrinc/sys/unistd.h >/dev/null 2>&1
 		then
 			dflt="$dflt -posix"
@@ -3974,7 +3974,7 @@ default|recommended)
 		;;
 	esac
 	case "$gccversion" in
-	1.*) ;;
+	1*) ;;
 	2.[0-8]*) ;;
 	?*) 	echo " "
 		echo "Checking if your compiler accepts -fno-strict-aliasing" 2>&1
@@ -4065,7 +4065,7 @@ esac
 : the following weeds options from ccflags that are of no interest to cpp
 cppflags="$ccflags"
 case "$gccversion" in
-1.*) cppflags="$cppflags -D__GNUC__"
+1*) cppflags="$cppflags -D__GNUC__"
 esac
 case "$mips_type" in
 '');;
@@ -16515,6 +16515,8 @@ EOT
 
 : Add in command line options if available
 $test -f UU/cmdline.opt && $cat UU/cmdline.opt >> config.sh
+
+echo "BuiltWithPatchPerl='2.04'" >>config.sh
 
 : add special variables
 $test -f $src/patchlevel.h && \
