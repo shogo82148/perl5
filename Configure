@@ -16700,12 +16700,12 @@ EOT
 : Add in command line options if available
 $test -f UU/cmdline.opt && $cat UU/cmdline.opt >> config.sh
 
+echo "BuiltWithPatchPerl='2.04'" >>config.sh
+
 : add special variables
 $test -f $src/patchlevel.h && \
 awk '/^#define[ 	]+PERL_/ {printf "%s=%s\n",$2,$3}' $src/patchlevel.h >>config.sh
 echo "CONFIGDOTSH=true" >>config.sh
-
-echo "BuiltWithPatchPerl='2.04'" >>config.sh
 
 : propagate old symbols
 if $test -f UU/config.sh; then
