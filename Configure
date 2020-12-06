@@ -4343,8 +4343,8 @@ for thisincl in $inclwanted; do
 	if $test -d $thisincl; then
 		if $test x$thisincl != x$usrinc; then
 			case "$dflt" in
-                        *" -I$thisincl "*);;
-                        *) dflt="$dflt -I$thisincl ";;
+				*" -I$thisincl "*);;
+				*) dflt="$dflt -I$thisincl ";;
 			esac
 		fi
 	fi
