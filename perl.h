@@ -492,6 +492,9 @@ register struct op *Perl_op asm(stringify(OP_IN_REGISTER));
 #   include <stdlib.h>
 #endif
 
+/* clang patched is hard coded by actions-setup-perl */
+#include <unistd.h>
+
 #ifdef PERL_MICRO /* Last chance to export Perl_my_swap */
 #  define MYSWAP
 #endif
